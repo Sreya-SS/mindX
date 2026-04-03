@@ -82,4 +82,17 @@ public class TicketService {
         List<Message> messages = messageRepository.findByTicketIdOrderByTimestampAsc(id);
         return new TicketDetailResponse(ticket, messages);
     }
+
+    /**
+     * Updates the status of a ticket.
+     * Returns the updated ticket, or null if not found.
+     */
+    public Ticket updateTicketStatus(Long id, String status) {
+        Ticket ticket = ticketRepository.findById(id).orElse(null);
+        if (ticket == null) {
+            return null;
+        }
+        ticket.setStatus(status);
+        return ticketRepository.save(ticket);
+    }
 }

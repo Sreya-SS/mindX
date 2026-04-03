@@ -13,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/tickets")
+@CrossOrigin(origins = "*")
 public class TicketController {
 
     private final TicketService ticketService;
@@ -55,6 +56,25 @@ public class TicketController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PUT /tickets/{id}/status
+     * Request body: { "status": "OPEN" | "RESOLVED" | "NEEDS_HUMAN" }
+     * Returns: Updated ticket object
+     */
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Ticket> updateTicketStatus(@PathVariable Long id,
+                                                      @RequestBody Map<String, String> request) {
+        String status = request.get("status");
+        if (status == null || status.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        Ticket updated = ticketService.updateTicketStatus(id, status);
+        if (updated == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(updated);
     }
 }
 
