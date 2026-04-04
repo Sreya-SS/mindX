@@ -6,12 +6,16 @@ import com.example.systemsupport.entity.Message;
 import com.example.systemsupport.entity.Ticket;
 import com.example.systemsupport.repository.MessageRepository;
 import com.example.systemsupport.repository.TicketRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class TicketService {
+
+    private static final Logger log = LoggerFactory.getLogger(TicketService.class);
 
     private final TicketRepository ticketRepository;
     private final MessageRepository messageRepository;
@@ -26,34 +30,57 @@ public class TicketService {
     }
 
     /**
-     * Creates a new ticket with status OPEN, saves the USER message,
-     * generates an AI response, and saves the AI message.
+     * Creates a new ticket with smart status escalation and priority tagging.
+     * Saves USER message, generates AI response, and saves AI message.
      */
     public TicketCreateResponse createTicket(String query) {
-        // 1. Create ticket
+        String lowerQuery = query.toLowerCase();
+
+        // 1. Determine status (escalation logic)
+        String status = "OPEN";
+        if (lowerQuery.contains("refund") || lowerQuery.contains("complaint") || lowerQuery.contains("angry")) {
+            status = "NEEDS_HUMAN";
+        }
+
+        // 2. Determine priority
+        String priority = "LOW";
+        if (lowerQuery.contains("refund") || lowerQuery.contains("angry")) {
+            priority = "HIGH";
+        } else if (lowerQuery.contains("complaint")) {
+            priority = "MEDIUM";
+        }
+
+        // 3. Create and save ticket
         Ticket ticket = new Ticket();
         ticket.setQuery(query);
-        ticket.setStatus("OPEN");
+        ticket.setStatus(status);
+        ticket.setPriority(priority);
         ticket = ticketRepository.save(ticket);
 
-        // 2. Save USER message
+        // 4. Save USER message
         Message userMessage = new Message();
         userMessage.setTicketId(ticket.getId());
         userMessage.setSender("USER");
         userMessage.setMessage(query);
         messageRepository.save(userMessage);
 
-        // 3. Generate AI response
-        String aiResponse = aiService.generateResponse(query);
+        // 5. Generate AI response
+        String aiResponse;
+        try {
+            aiResponse = aiService.generateResponse(query);
+        } catch (Exception e) {
+            log.error("AI service failed for ticket {}: {}", ticket.getId(), e.getMessage());
+            aiResponse = "Our AI is currently unavailable. A human agent will review your request.";
+        }
 
-        // 4. Save AI message
-        Message aiMessage = new Message();
-        aiMessage.setTicketId(ticket.getId());
-        aiMessage.setSender("AI");
-        aiMessage.setMessage(aiResponse);
-        messageRepository.save(aiMessage);
+        // 6. Save AI message
+        Message aiMsg = new Message();
+        aiMsg.setTicketId(ticket.getId());
+        aiMsg.setSender("AI");
+        aiMsg.setMessage(aiResponse);
+        messageRepository.save(aiMsg);
 
-        // 5. Return response
+        // 7. Return response
         return new TicketCreateResponse(ticket.getId(), aiResponse);
     }
 
